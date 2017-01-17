@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-import pyR309
+import fingerprint.r309
 import time
 
-r309 = pyR309.PyR309()
+r309 = fingerprint.r309.R309()
 
 if not r309.connect("/dev/ttyS1"):
 	raise Exception("Fingerprint sensor not connected.")

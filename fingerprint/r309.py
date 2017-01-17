@@ -1,6 +1,6 @@
 
 """
-PyR039
+r039
 
 @author: Rafa Couto <caligari@treboada.net>
 """
@@ -27,7 +27,7 @@ PACKET_SIZE_64 = 1
 PACKET_SIZE_128 = 2
 PACKET_SIZE_256 = 3
 
-class PyR309(object):
+class R309(object):
 
     SYSPARAM_BAUD_RATE = 0x04
     SYSPARAM_SECURITY_LEVEL = 0x05
@@ -67,7 +67,7 @@ class PyR309(object):
             self.__serial.open()
 
         answer = self.__verifyPassword()
-        if (answer['type'] != PyR309.PACKET_TYPE_ACK) or (answer['payload'][0] != PyR309.CODE_OK):
+        if (answer['type'] != R309.PACKET_TYPE_ACK) or (answer['payload'][0] != R309.CODE_OK):
             raise Exception("Something was wrong when verifying device password.")
 
         return True
@@ -105,7 +105,7 @@ class PyR309(object):
         answer = self.__templateNum()
         payload = answer['payload']
 
-        if (answer['type'] != PyR309.PACKET_TYPE_ACK) or (payload[0] != PyR309.CODE_OK):
+        if (answer['type'] != R309.PACKET_TYPE_ACK) or (payload[0] != R309.CODE_OK):
             raise Exception("Something was wrong when getting the valid template number.")
 
         return (payload[1] << 8) | payload[2]
@@ -113,7 +113,7 @@ class PyR309(object):
     def scanFinger(self):
 
         answer = self.__getImg()
-        if (answer['type'] == PyR309.PACKET_TYPE_ACK):
+        if (answer['type'] == R309.PACKET_TYPE_ACK):
 
             code = answer['payload'][0]
             if code == 0:
@@ -129,7 +129,7 @@ class PyR309(object):
 
         answer = self.__readSysParams()
 
-        if (answer['type'] != PyR309.PACKET_TYPE_ACK) or (answer['payload'][0] != PyR309.CODE_OK):
+        if (answer['type'] != R309.PACKET_TYPE_ACK) or (answer['payload'][0] != R309.CODE_OK):
             raise Exception("Something was wrong when reading system parameters.")
 
         regs = answer['payload'][1:17]
@@ -145,38 +145,38 @@ class PyR309(object):
 
     def __setSysParam(self, param, value):
 
-        data = self.__buildCommand(PyR309.COMMAND_SETSYSPARAM)
+        data = self.__buildCommand(R309.COMMAND_SETSYSPARAM)
         data += struct.pack(">B", param)
         data += struct.pack(">B", value)
 
-        self.__sendPacket(PyR309.PACKET_TYPE_CMD, data)
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         answer = self.__receivePacket()
 
-        if (answer['type'] != PyR309.PACKET_TYPE_ACK) or (payload[0] != PyR309.CODE_OK):
+        if (answer['type'] != R309.PACKET_TYPE_ACK) or (payload[0] != R309.CODE_OK):
             raise Exception("Something was wrong when setting system param %i." % param)
 
     def __verifyPassword(self):
 
-        data = self.__buildCommand(PyR309.COMMAND_VFYPWD)
-        self.__sendPacket(PyR309.PACKET_TYPE_CMD, data)
+        data = self.__buildCommand(R309.COMMAND_VFYPWD)
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         return self.__receivePacket()
 
     def __readSysParams(self):
 
-        data = self.__buildCommand(PyR309.COMMAND_READSYSPARAMS)
-        self.__sendPacket(PyR309.PACKET_TYPE_CMD, data)
+        data = self.__buildCommand(R309.COMMAND_READSYSPARAMS)
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         return self.__receivePacket()
 
     def __templateNum(self):
 
-        data = self.__buildCommand(PyR309.COMMAND_TEMPLATENUM)
-        self.__sendPacket(PyR309.PACKET_TYPE_CMD, data)
+        data = self.__buildCommand(R309.COMMAND_TEMPLATENUM)
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         return self.__receivePacket()
 
     def __getImg(self):
 
-        data = self.__buildCommand(PyR309.COMMAND_GETIMG)
-        self.__sendPacket(PyR309.PACKET_TYPE_CMD, data)
+        data = self.__buildCommand(R309.COMMAND_GETIMG)
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         return self.__receivePacket()
 
     def __sendPacket(self, type, data):
