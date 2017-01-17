@@ -3,7 +3,7 @@
 import pyR309
 import time
 
-r309 = pyr309.PyR309()
+r309 = pyR309.PyR309()
 
 if not r309.connect("/dev/ttyS1"):
 	raise Exception("Fingerprint sensor not connected.")
