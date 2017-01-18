@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
 import fingerprint.r309
+import os
 import time
 
+# import the module
 r309 = fingerprint.r309.R309()
 
-if not r309.connect("/dev/ttyS1"):
-	raise Exception("Fingerprint sensor not connected.")
+port = os.getenv('FINGERPRINT_PORT', "/dev/ttyUSB1")
+
+if not r309.connect(port):
+	raise Exception("Fingerprint sensor not connected in %s." % port)
 
 print("Security level (1-5): %i" % r309.getSecurityLevel())
 print("Storage capacity: %i" % r309.getStorageCapacity())
