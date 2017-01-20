@@ -142,7 +142,6 @@ class R309(object):
             code = result['code']
             if  code == R309.CODE_OK:
                 # match OK
-                result['match'] = result['match']
                 result['message'] = "Matched with register #%i" % result['match']
             else:
                 # no match or errors

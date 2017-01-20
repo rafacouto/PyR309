@@ -26,7 +26,7 @@ while True:
         result = r309.identify()
         if result['code'] == R309.CODE_OK:
             # match OK
-            print("Template #%i was identified." % result['match'])
+            print("Template #%i was identified (accuracy %i)." % result['match'], result['score'])
 
         elif result['code'] == R309.CODE_NO_MATCH:
             # no match
