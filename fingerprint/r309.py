@@ -43,10 +43,18 @@ class R309(object):
     COMMAND_SETSYSPARAM = 0x0E
     COMMAND_TEMPLATENUM = 0x1D
     COMMAND_GETIMG = 0x01
+    COMMAND_IMG2TZ = 0x02
+    COMMAND_SEARCH = 0x04
 
     CODE_OK = 0x00
     CODE_PACKAGE_ERROR = 0x01
+    CODE_NO_FINGER= 0x02
+    CODE_INVALID_TEMPLATE = 0x03
     CODE_WRONG_PASSWORD = 0X13
+    CODE_IMG_DISORDER = 0x06
+    CODE_IMG_SMALL = 0x07
+    CODE_IMG_INVALID = 0x15
+    CODE_NO_MATCH = 0x09
 
     __address = None
 
@@ -112,27 +120,56 @@ class R309(object):
 
     def scanFinger(self):
 
-        answer = self.__getImg()
-        if (answer['type'] == R309.PACKET_TYPE_ACK):
+        result = self.__getImg()
 
-            code = answer['payload'][0]
-            if code == 0:
-                return { 'success': True, 'code': code, 'message': "" }
-            elif code == 2:
+        if (result['type'] == R309.PACKET_TYPE_ACK):
+
+            code = result['code']
+            if  code == R309.CODE_OK:
+                return { 'success': True, 'code': code, 'message': "Finger detected." }
+            elif code == R309.CODE_NO_FINGER:
                 return { 'success': False, 'code': code, 'message': "Finger was not detected." }
-            elif code == 3:
+            elif code == R309.CODE_INVALID_TEMPLATE:
                 return { 'success': False, 'code': code, 'message': "Template was not read." }
 
         raise Exception("Something was wrong when scanning finger.")
 
+    def identify(self):
+
+        result = self.__find()
+        if (result['type'] == R309.PACKET_TYPE_ACK):
+
+            code = result['code']
+            if  code == R309.CODE_OK:
+                # match OK
+                result['match'] = result['match']
+                result['message'] = "Matched with register #%i" % result['match']
+            else:
+                # no match or errors
+                result['match'] = None
+                if code == R309.CODE_NO_MATCH:
+                    result['message'] = "No match."
+                elif code == R309.CODE_IMG_DISORDER:
+                    result['message'] = "Over-disorderly fingerprint image."
+                elif code == R309.CODE_IMG_SMALL:
+                    result['message'] = "Lackness of character point or over-smallness of fingerprint image."
+                elif code == R309.CODE_IMG_INVALID:
+                    result['message'] = "Lackness of valid primary image."
+                else:
+                    raise Exception("Unknown error when identifying template.")
+
+            return result
+
+        raise Exception("Something was wrong when identifying template.")
+
     def __getSysParams(self):
 
-        answer = self.__readSysParams()
+        result = self.__readSysParams()
 
-        if (answer['type'] != R309.PACKET_TYPE_ACK) or (answer['payload'][0] != R309.CODE_OK):
+        if (result['type'] != R309.PACKET_TYPE_ACK) or (result['code'] != R309.CODE_OK):
             raise Exception("Something was wrong when reading system parameters.")
 
-        regs = answer['payload'][1:17]
+        regs = result['payload'][1:17]
         return { 
             'status': (regs[0] << 8) | regs[1],
             'sys_id': (regs[2] << 8) | regs[3],
@@ -150,9 +187,9 @@ class R309(object):
         data += struct.pack(">B", value)
 
         self.__sendPacket(R309.PACKET_TYPE_CMD, data)
-        answer = self.__receivePacket()
+        result = self.__receivePacket()
 
-        if (answer['type'] != R309.PACKET_TYPE_ACK) or (payload[0] != R309.CODE_OK):
+        if (result['type'] != R309.PACKET_TYPE_ACK) or (result['code'] != R309.CODE_OK):
             raise Exception("Something was wrong when setting system param %i." % param)
 
     def __verifyPassword(self):
@@ -178,6 +215,39 @@ class R309(object):
         data = self.__buildCommand(R309.COMMAND_GETIMG)
         self.__sendPacket(R309.PACKET_TYPE_CMD, data)
         return self.__receivePacket()
+
+    def __img2tz(self, buffer = 1):
+
+        data = self.__buildCommand(R309.COMMAND_IMG2TZ)
+        data += struct.pack(">B", buffer) 
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
+        return self.__receivePacket()
+
+    def __search(self, page_offset, page_count, buffer = 1):
+
+        data = self.__buildCommand(R309.COMMAND_SEARCH)
+        data += struct.pack(">B", buffer) 
+        data += struct.pack(">I", page_offset) 
+        data += struct.pack(">I", page_count) 
+        self.__sendPacket(R309.PACKET_TYPE_CMD, data)
+        return self.__receivePacket()
+
+    def __find(self, buffer = 1):
+
+        result = self.__img2tz(buffer)
+        if (result['type'] == R309.PACKET_TYPE_ACK) and (result['code'] == R309.CODE_OK):
+
+            # ToDo: set count with number of templates
+            count = 1000
+            result = self.__search(0, count, buffer)
+            if result['type'] == R309.PACKET_TYPE_ACK:
+
+                payload = result['payload']
+                if result['code'] == R309.CODE_OK:
+                    result['match'] = (payload[1] << 8) | payload[2]
+                    result['score'] = (payload[3] << 8) | payload[4]
+
+        return result
 
     def __sendPacket(self, type, data):
 
@@ -240,7 +310,7 @@ class R309(object):
         if packet[9] == 0x01:
             raise exception("Error when receiving the packet.")
 
-        return { 'type': packet[6], 'payload': packet[9:-2] }
+        return { 'type': packet[6], 'payload': packet[9:-2], 'code': packet[9] }
 
     def __buildCommand(self, cmd):
 
