@@ -62,33 +62,41 @@ class R309(object):
 
     __serial = None
 
+    __sys_params = None
+
     def __init__(self, address = 0xffffffff, password = 0x00000000):
 
         self.__address = address
         self.__password = password
 
-    def connect(self, port, bps = 57600):
+    def connect(self, port, bps = 57600, timeout = 2):
 
         self.__serial = serial.Serial(port = port, baudrate = bps, write_timeout = 2)
 
         if not self.__serial.isOpen(): 
             self.__serial.open()
+            
+        self.__serial.timeout = timeout
 
-        answer = self.__verifyPassword()
-        if (answer['type'] != R309.PACKET_TYPE_ACK) or (answer['payload'][0] != R309.CODE_OK):
+        result = self.__verifyPassword()
+        if (result['type'] != R309.PACKET_TYPE_ACK) or (result['code'] != R309.CODE_OK):
             raise Exception("Something was wrong when verifying device password.")
+
+        self.__getSysParams()
 
         return True
 
     def getSecurityLevel(self):
 
-        sys_params = self.__getSysParams()
-        return sys_params['security_level']
+        return self.__sys_params['security_level']
 
     def getPacketSize(self):
 
-        sys_params = self.__getSysParams()
-        return sys_params['data_size']
+        return self.__sys_params['data_size']
+
+    def getStorageCapacity(self):
+
+        return self.__sys_params['lib_size']
 
     def setBaudrate(self, baudrate):
 
@@ -98,24 +106,17 @@ class R309(object):
 
         self.__setSysParam(SYSPARAM_SECURITY_LEVEL, level)
         
-
     def setPacketSize(self, size):
 
         self.__setSysParam(SYSPARAM_PACKET_SIZE, size)
         
-    def getStorageCapacity(self):
-
-        sys_params = self.__getSysParams()
-        return sys_params['lib_size']
-
     def getNextTemplateNumber(self):
 
-        answer = self.__templateNum()
-        payload = answer['payload']
-
-        if (answer['type'] != R309.PACKET_TYPE_ACK) or (payload[0] != R309.CODE_OK):
+        result = self.__templateNum()
+        if (result['type'] != R309.PACKET_TYPE_ACK) or (result['code'] != R309.CODE_OK):
             raise Exception("Something was wrong when getting the valid template number.")
 
+        payload = result['payload']
         return (payload[1] << 8) | payload[2]
 
     def scanFinger(self):
@@ -169,7 +170,7 @@ class R309(object):
             raise Exception("Something was wrong when reading system parameters.")
 
         regs = result['payload'][1:17]
-        return { 
+        self.__sys_params = { 
             'status': (regs[0] << 8) | regs[1],
             'sys_id': (regs[2] << 8) | regs[3],
             'lib_size': (regs[4] << 8) | regs[5],
@@ -190,6 +191,8 @@ class R309(object):
 
         if (result['type'] != R309.PACKET_TYPE_ACK) or (result['code'] != R309.CODE_OK):
             raise Exception("Something was wrong when setting system param %i." % param)
+
+        self.__getSysParams()
 
     def __verifyPassword(self):
 
@@ -236,13 +239,12 @@ class R309(object):
         result = self.__img2tz(buffer)
         if (result['type'] == R309.PACKET_TYPE_ACK) and (result['code'] == R309.CODE_OK):
 
-            # ToDo: set count with number of templates
-            count = 1000
+            count = self.__sys_params['lib_size']
             result = self.__search(0, count, buffer)
             if result['type'] == R309.PACKET_TYPE_ACK:
 
-                payload = result['payload']
                 if result['code'] == R309.CODE_OK:
+                    payload = result['payload']
                     result['match'] = (payload[1] << 8) | payload[2]
                     result['score'] = (payload[3] << 8) | payload[4]
 
@@ -267,18 +269,20 @@ class R309(object):
 
         self.__serial.write(packet)
 
-    def __receivePacket(self, timeout = 1):
+    def __receivePacket(self):
 
         packet = []
 
-        seconds = 0
-        while seconds <= timeout:
+        while True:
 
-            waiting = self.__serial.in_waiting
-            if waiting > 0:
-                for c in self.__serial.read(waiting):
+            pending = self.__serial.in_waiting
+            if pending == 0:
+                # timeout
+                pass
+            else:
+                # read pending bytes
+                for c in self.__serial.read(pending):
                     packet.append(ord(c))
-                timeout = 0
 
             if len(packet) >= 9:
 
@@ -288,9 +292,6 @@ class R309(object):
                 length = (packet[7] << 8) + packet[8]
                 if len(packet) >= length + 9:
                     return self.__processPacket(packet, length)
-
-            time.sleep(0.10)
-            seconds += 0.10
 
         raise Exception("Timed out while receiving the packet (%i bytes received)." % len(packet))
 

@@ -46,6 +46,6 @@ while True:
             # finger detected but error with template
             print(result['message'])
 
-    time.sleep(3);
+    time.sleep(1);
 
 
