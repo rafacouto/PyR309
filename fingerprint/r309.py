@@ -135,9 +135,9 @@ class R309(object):
 
         raise Exception("Something was wrong when scanning finger.")
 
-    def identify(self):
+    def identify(self, buffer = 1):
 
-        result = self.__find()
+        result = self.__find(buffer)
         if (result['type'] == R309.PACKET_TYPE_ACK):
 
             code = result['code']
@@ -161,6 +161,10 @@ class R309(object):
             return result
 
         raise Exception("Something was wrong when identifying template.")
+
+    def enroll(self):
+
+        pass
 
     def __getSysParams(self):
 
@@ -278,7 +282,7 @@ class R309(object):
             pending = self.__serial.in_waiting
             if pending == 0:
                 # timeout
-                pass
+                break
             else:
                 # read pending bytes
                 for c in self.__serial.read(pending):
